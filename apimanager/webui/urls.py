@@ -6,6 +6,7 @@ URLs for config app
 from django.conf.urls import url
 
 from .views import IndexView
+from .views import MethodRoutingView
 
 urlpatterns = [
     url(r'^$',

@@ -33,12 +33,19 @@ class IndexView(LoginRequiredMixin, TemplateView):
         try:
             urlpath = '/entitlement-requests'
             entitlement_requests = api.get(urlpath)
-            entitlement_requests = entitlement_requests['entitlement_requests']
-            entitlement_requests = FilterTime(context, self.request.GET, 'created') \
-                .apply(entitlement_requests)
-            entitlement_requests = self.scrub(entitlement_requests)
+            if 'code' in entitlement_requests and entitlement_requests['code']>=400:
+                messages.error(self.request, entitlement_requests['message'])
+                entitlement_requests=[]
+            else:
+                entitlement_requests = entitlement_requests['entitlement_requests']
+                entitlement_requests = FilterTime(context, self.request.GET, 'created') \
+                    .apply(entitlement_requests)
+                entitlement_requests = self.scrub(entitlement_requests)
+                entitlement_requests = sorted(entitlement_requests, key=lambda k: k['created'], reverse=True)
         except APIError as err:
             messages.error(self.request, err)
+        except:
+            messages.error(self.request, "Unknown Error")
 
         context.update({
             'entitlementrequests': entitlement_requests,
@@ -60,6 +67,8 @@ class RejectEntitlementRequest(LoginRequiredMixin, View):
             messages.success(request, msg)
         except APIError as err:
             messages.error(request, err)
+        except:
+            messages.error(self.request, "Unknown Error")
 
         redirect_url = request.POST.get('next', reverse('entitlementrequests-index'))
         return HttpResponseRedirect(redirect_url)
@@ -83,6 +92,8 @@ class AcceptEntitlementRequest(LoginRequiredMixin, View):
             messages.success(request, msg)
         except APIError as err:
             messages.error(request, err)
+        except:
+            messages.error(self.request, "Unknown Error")
 
         try:
             urlpath = '/entitlement-requests/{}'.format(request.POST.get('entitlement_request_id', '<undefined>'))
@@ -92,6 +103,8 @@ class AcceptEntitlementRequest(LoginRequiredMixin, View):
             messages.success(request, msg)
         except APIError as err:
             messages.error(request, err)
+        except:
+            messages.error(self.request, "Unknown Error")
 
         redirect_url = request.POST.get('next', reverse('entitlementrequests-index'))
         return HttpResponseRedirect(redirect_url)

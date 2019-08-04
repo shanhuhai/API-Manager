@@ -51,10 +51,12 @@ INSTALLED_APPS = [
     'obp',
     'consumers',
     'users',
+    'branches',
     'entitlementrequests',
     'customers',
     'metrics',
     'config',
+    'webui',
 ]
 
 MIDDLEWARE = [
@@ -223,21 +225,7 @@ DIRECTLOGIN_PATH = '/my/logins/direct'
 # Set to true if the API is connected to a core banking system
 GATEWAYLOGIN_HAS_CBS = False
 
-# Local settings can override anything in here
-try:
-    from apimanager.local_settings import *  # noqa
-except ImportError:
-    pass
 
-if not OAUTH_CONSUMER_KEY:
-    raise ImproperlyConfigured('Missing settings for OAUTH_CONSUMER_KEY')
-if not OAUTH_CONSUMER_SECRET:
-    raise ImproperlyConfigured('Missing settings for OAUTH_CONSUMER_SECRET')
-
-# Settings here might use parts overwritten in local settings
-API_ROOT = API_HOST + API_BASE_PATH + API_VERSION
-# For some reason, swagger is not available at the latest API version
-API_URL_SWAGGER = API_HOST + '/obp/v1.4.0/resource-docs/v' + API_VERSION + '/swagger'  # noqa
 
 CACHES = {
     'default': {
@@ -261,7 +249,20 @@ EXCLUDE_URL_PATTERN = []
 API_EXPLORER_APP_NAME = 'xxx'
 
 
+# Local settings can override anything in here
+try:
+    from apimanager.local_settings import *  # noqa
+except ImportError:
+    pass
 
+# Settings here might use parts overwritten in local settings
+API_ROOT = API_HOST + API_BASE_PATH + API_VERSION
+# For some reason, swagger is not available at the latest API version
+API_URL_SWAGGER = API_HOST + '/obp/v1.4.0/resource-docs/v' + API_VERSION + '/swagger'  # noqa
 
+VERIFY = True if API_HOST.startswith("https") else False
 
-
+if not OAUTH_CONSUMER_KEY:
+    raise ImproperlyConfigured('Missing settings for OAUTH_CONSUMER_KEY')
+if not OAUTH_CONSUMER_SECRET:
+    raise ImproperlyConfigured('Missing settings for OAUTH_CONSUMER_SECRET')

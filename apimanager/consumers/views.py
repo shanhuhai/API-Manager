@@ -69,26 +69,31 @@ class IndexView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super(IndexView, self).get_context_data(**kwargs)
         consumers = []
+        sorted_consumers=[]
         api = API(self.request.session.get('obp'))
         try:
             urlpath = '/management/consumers'
             consumers = api.get(urlpath)
-            consumers = FilterEnabled(context, self.request.GET)\
-                .apply(consumers['list'])
-            consumers = FilterAppType(context, self.request.GET)\
-                .apply(consumers)
-            consumers = FilterTime(context, self.request.GET, 'created')\
-                .apply(consumers)
-            consumers = self.scrub(consumers)
+            if 'code' in consumers and consumers['code']==403:
+                messages.error(self.request, consumers['message'])
+            else:
+                consumers = FilterEnabled(context, self.request.GET)\
+                    .apply(consumers['list'])
+                consumers = FilterAppType(context, self.request.GET)\
+                    .apply(consumers)
+                consumers = FilterTime(context, self.request.GET, 'created')\
+                    .apply(consumers)
+                consumers = self.scrub(consumers)
+                sorted_consumers = sorted(
+                    consumers, key=lambda consumer: consumer['created'], reverse=True)
+
+                context.update({
+                    'consumers': sorted_consumers,
+                    'statistics': self.compile_statistics(consumers),
+                })
         except APIError as err:
             messages.error(self.request, err)
 
-        sorted_consumers = sorted(
-            consumers, key=lambda consumer: consumer['created'], reverse=True)
-        context.update({
-            'consumers': sorted_consumers,
-            'statistics': self.compile_statistics(consumers),
-        })
         return context
 
 
@@ -128,6 +133,9 @@ class DetailView(LoginRequiredMixin, FormView):
         except APIError as err:
             messages.error(self.request, err)
             return super(DetailView, self).form_invalid(form)
+        except Exception as err:
+            messages.error(self.request, "{}".format(err))
+            return super(DetailView, self).form_invalid(form)
 
         msg = 'calls limit of consumer {} has been updated successfully.'.format(
             data['consumer_id'])
@@ -144,20 +152,25 @@ class DetailView(LoginRequiredMixin, FormView):
             consumer['created'] = datetime.strptime(
                 consumer['created'], settings.API_DATETIMEFORMAT)
 
-            call_limits_urlpath = '/management/consumers/{}/consumer/calls_limit'.format(self.kwargs['consumer_id'])
+            call_limits_urlpath = '/management/consumers/{}/consumer/call-limits'.format(self.kwargs['consumer_id'])
             consumer_call_limtis = api.get(call_limits_urlpath)
-            consumer['per_minute_call_limit'] = consumer_call_limtis['per_minute_call_limit']
-            consumer['per_hour_call_limit'] = consumer_call_limtis['per_hour_call_limit']
-            consumer['per_day_call_limit'] = consumer_call_limtis['per_day_call_limit']
-            consumer['per_week_call_limit'] = consumer_call_limtis['per_week_call_limit']
-            consumer['per_month_call_limit'] = consumer_call_limtis['per_month_call_limit']
+            if 'code' in consumer_call_limtis and consumer_call_limtis['code'] > 400:
+                messages.error(self.request, "{}".format(consumer_call_limtis['message']))
+            else:
+                consumer['per_minute_call_limit'] = consumer_call_limtis['per_minute_call_limit']
+                consumer['per_hour_call_limit'] = consumer_call_limtis['per_hour_call_limit']
+                consumer['per_day_call_limit'] = consumer_call_limtis['per_day_call_limit']
+                consumer['per_week_call_limit'] = consumer_call_limtis['per_week_call_limit']
+                consumer['per_month_call_limit'] = consumer_call_limtis['per_month_call_limit']
 
         except APIError as err:
             messages.error(self.request, err)
-
-        context.update({
-            'consumer': consumer
-        })
+        except Exception as err:
+            messages.error(self.request, "{}".format(err))
+        finally:
+            context.update({
+                'consumer': consumer
+            })
         return context
 
 
@@ -175,6 +188,8 @@ class EnableDisableView(LoginRequiredMixin, RedirectView):
             messages.success(self.request, self.success)
         except APIError as err:
             messages.error(self.request, err)
+        except:
+            messages.error(self.request, "Unknown")
 
         urlpath = self.request.POST.get('next', reverse('consumers-index'))
         query = self.request.GET.urlencode()
